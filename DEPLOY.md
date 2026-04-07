@@ -105,3 +105,13 @@ npm install
 npm run build
 pm2 restart new-search
 ```
+
+也可以直接执行仓库内的一键更新脚本：
+```bash
+cd /opt/new-search
+bash deploy/update.sh
+```
+
+可选环境变量：
+- `APP_NAME`：默认 `new-search`
+- `PORT`：默认 `3000`
