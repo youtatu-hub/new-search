@@ -138,7 +138,10 @@ const sendFile = (response, filePath) => {
   };
 
   response.writeHead(200, {
-    "Content-Type": typeMap[ext] || "application/octet-stream"
+    "Content-Type": typeMap[ext] || "application/octet-stream",
+    "Cache-Control": "no-store, no-cache, must-revalidate",
+    Pragma: "no-cache",
+    Expires: "0"
   });
   fs.createReadStream(filePath).pipe(response);
 };
