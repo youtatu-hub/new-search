@@ -11,6 +11,7 @@ yarn-error.log*
 .vscode/*
 .data/
 data/
+backups/
 *.db
 *.sqlite
 *.sqlite3
