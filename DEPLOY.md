@@ -109,7 +109,7 @@ pm2 restart new-search
 也可以直接执行仓库内的一键更新脚本：
 ```bash
 cd /opt/new-search
-bash deploy/update.sh
+sh deploy/update.sh
 ```
 
 可选环境变量：

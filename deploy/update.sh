@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-set -euo pipefail
+set -eu
 
 APP_NAME="${APP_NAME:-new-search}"
 PORT="${PORT:-3000}"
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%F %T')" "$1"
