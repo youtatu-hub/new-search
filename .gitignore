@@ -9,3 +9,10 @@ yarn-error.log*
 .pnp.js
 
 .vscode/*
+.data/
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+dist/

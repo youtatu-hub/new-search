@@ -1,10 +1,11 @@
 {
-  "name": "${PROJECT_NAME}",
+  "name": "new-search",
   "version": "1.0.0",
-  "description": "",
-  "main": "dist/index.js",
+  "description": "每日行业链接展示与手动录入面板",
+  "main": "server.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "start": "node server.js"
   },
   "dependencies": {},
   "devDependencies": {
