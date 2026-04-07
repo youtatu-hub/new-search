@@ -15,11 +15,23 @@ type DailyBatch = {
   links: DailyLink[];
 };
 
+type ViewState = {
+  batches: DailyBatch[];
+  currentIndex: number;
+  keyword: string;
+};
+
 const app = document.querySelector<HTMLDivElement>("#app");
 
 if (!app) {
   throw new Error("找不到 #app 容器");
 }
+
+const state: ViewState = {
+  batches: [],
+  currentIndex: 0,
+  keyword: ""
+};
 
 const escapeHtml = (value: string) =>
   value
@@ -58,143 +70,193 @@ const getHostname = (url: string) => {
   }
 };
 
-const render = (batches: DailyBatch[], keyword = "") => {
+const filterLinks = (batch: DailyBatch, keyword: string) => {
   const normalizedKeyword = keyword.trim().toLowerCase();
-  const filteredBatches = batches
-    .map((batch) => ({
-      ...batch,
-      links: batch.links.filter((link) => {
-        if (!normalizedKeyword) {
-          return true;
-        }
 
-        return [link.url, getHostname(link.url), batch.keywords.join(" ")]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedKeyword);
-      })
-    }))
-    .filter((batch) => batch.links.length > 0);
+  return batch.links.filter((link) => {
+    if (!normalizedKeyword) {
+      return true;
+    }
 
-  const currentBatch = batches[0];
-  const linkTotal = filteredBatches.reduce((sum, batch) => sum + batch.links.length, 0);
-  const keywordText = currentBatch?.keywords.join(" | ") ?? "";
-
-  app.innerHTML = `
-    <section class="hero">
-      <div>
-        <p class="eyebrow">Daily Mining News Board</p>
-        <h1>每日行业链接面板</h1>
-        <p class="hero-copy">
-          结果由手动采集录入 SQLite，按日期归档，按相关度排序展示，适合每天快速核对和直接跳转。
-        </p>
-      </div>
-      <div class="hero-stats">
-        <article>
-          <span>最新采集</span>
-          <strong>${escapeHtml(currentBatch?.schedule ?? "-")}</strong>
-        </article>
-        <article>
-          <span>当前结果</span>
-          <strong>${linkTotal}</strong>
-        </article>
-        <article>
-          <span>录入入口</span>
-          <strong><a class="admin-link" href="/admin.html">打开后台</a></strong>
-        </article>
-      </div>
-    </section>
-
-    <section class="toolbar">
-      <div class="toolbar-main">
-        <label class="search">
-          <span>快速筛选</span>
-          <input
-            id="search-input"
-            type="search"
-            placeholder="按域名、链接、关键词过滤"
-            value="${escapeHtml(keyword)}"
-          />
-        </label>
-        <p class="keyword-line">${escapeHtml(keywordText)}</p>
-      </div>
-      <p class="toolbar-tip">每日数据来自 SQLite，默认按日期倒序、链接相关度升序显示。</p>
-    </section>
-
-    <section class="timeline">
-      ${
-        filteredBatches.length
-          ? filteredBatches
-              .map(
-                (batch) => `
-                  <article class="date-section">
-                    <header class="date-header">
-                      <div>
-                        <p class="date-label">${escapeHtml(batch.date)}</p>
-                        <h2>${escapeHtml(formatDateHeading(batch.date))}</h2>
-                      </div>
-                      <span class="date-count">${batch.links.length} 条结果</span>
-                    </header>
-                    <div class="card-grid">
-                      ${batch.links
-                        .map(
-                          (item) => `
-                            <section class="link-card">
-                              <div class="card-top">
-                                <span class="source-badge">相关度 #${item.rank}</span>
-                                <time>${escapeHtml(formatDateTime(item.collectedAt))}</time>
-                              </div>
-                              <h3>${escapeHtml(getHostname(item.url))}</h3>
-                              <p class="url-preview">${escapeHtml(item.url)}</p>
-                              <div class="tag-row">
-                                <span>${escapeHtml(batch.schedule)}</span>
-                                ${batch.keywords
-                                  .slice(0, 3)
-                                  .map((tag) => `<span>${escapeHtml(tag)}</span>`)
-                                  .join("")}
-                              </div>
-                              <div class="card-actions">
-                                <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">
-                                  打开链接
-                                </a>
-                              </div>
-                            </section>
-                          `
-                        )
-                        .join("")}
-                    </div>
-                  </article>
-                `
-              )
-              .join("")
-          : `
-            <article class="empty-state">
-              <h2>没有匹配到结果</h2>
-              <p>可以尝试输入域名片段，例如 sina、people、gov。</p>
-            </article>
-          `
-      }
-    </section>
-  `;
-
-  const searchInput = document.querySelector<HTMLInputElement>("#search-input");
-  searchInput?.addEventListener("input", (event) => {
-    const nextKeyword = (event.target as HTMLInputElement).value;
-    render(batches, nextKeyword);
+    return [link.url, getHostname(link.url), batch.keywords.join(" ")]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedKeyword);
   });
 };
 
-const renderMessage = (title: string, message: string) => {
+const renderEmpty = (title: string, message: string) => {
   app.innerHTML = `
-    <section class="empty-state">
+    <section class="empty-state empty-alone">
       <h2>${escapeHtml(title)}</h2>
       <p>${escapeHtml(message)}</p>
     </section>
   `;
 };
 
+const render = () => {
+  if (!state.batches.length) {
+    renderEmpty("暂无数据", "当前数据库还没有可展示的每日链接。");
+    return;
+  }
+
+  const currentBatch = state.batches[state.currentIndex];
+  const filteredLinks = filterLinks(currentBatch, state.keyword);
+  const hasPrevDay = state.currentIndex < state.batches.length - 1;
+  const hasNextDay = state.currentIndex > 0;
+  const prevDate = hasPrevDay ? state.batches[state.currentIndex + 1].date : "";
+  const nextDate = hasNextDay ? state.batches[state.currentIndex - 1].date : "";
+
+  app.innerHTML = `
+    <div class="page-frame">
+      <button
+        class="day-nav day-nav-prev"
+        type="button"
+        data-action="prev-day"
+        ${hasPrevDay ? "" : "disabled"}
+        aria-label="切换到上一天"
+      >
+        <span class="nav-arrow">‹</span>
+        <span class="nav-copy">
+          <strong>上一天</strong>
+          <small>${escapeHtml(prevDate || "无数据")}</small>
+        </span>
+      </button>
+
+      <button
+        class="day-nav day-nav-next"
+        type="button"
+        data-action="next-day"
+        ${hasNextDay ? "" : "disabled"}
+        aria-label="切换到下一天"
+      >
+        <span class="nav-copy">
+          <strong>下一天</strong>
+          <small>${escapeHtml(nextDate || "无数据")}</small>
+        </span>
+        <span class="nav-arrow">›</span>
+      </button>
+
+      <section class="overview-panel">
+        <div class="overview-head">
+          <div>
+            <p class="eyebrow">Daily Mining News Board</p>
+            <h1>${escapeHtml(formatDateHeading(currentBatch.date))}</h1>
+            <p class="hero-copy">
+              一次只查看一天的数据，顶部信息、筛选和跳转入口集中到同一个面板中，便于快速核对当天结果。
+            </p>
+          </div>
+          <div class="hero-stats">
+            <article>
+              <span>采集时间</span>
+              <strong>${escapeHtml(currentBatch.schedule)}</strong>
+            </article>
+            <article>
+              <span>当日结果</span>
+              <strong>${filteredLinks.length}</strong>
+            </article>
+            <article>
+              <span>录入入口</span>
+              <strong><a class="admin-link" href="/admin.html">打开后台</a></strong>
+            </article>
+          </div>
+        </div>
+
+        <div class="overview-tools">
+          <div class="toolbar-main">
+            <label class="search">
+              <span>快速筛选</span>
+              <input
+                id="search-input"
+                type="search"
+                placeholder="按域名、链接、关键词过滤"
+                value="${escapeHtml(state.keyword)}"
+              />
+            </label>
+            <p class="keyword-line">${escapeHtml(currentBatch.keywords.join(" | "))}</p>
+          </div>
+          <p class="toolbar-tip">左右悬浮按钮用于切换日期，当前页面只保留当日内容。</p>
+        </div>
+      </section>
+
+      <section class="day-stage">
+        ${
+          filteredLinks.length
+            ? `
+              <div class="day-meta">
+                <p class="date-label">${escapeHtml(currentBatch.date)}</p>
+                <span class="date-count">${filteredLinks.length} 条结果</span>
+              </div>
+              <div class="card-grid">
+                ${filteredLinks
+                  .map(
+                    (item) => `
+                      <section class="link-card">
+                        <div class="card-top">
+                          <span class="source-badge">相关度 #${item.rank}</span>
+                          <time>${escapeHtml(formatDateTime(item.collectedAt))}</time>
+                        </div>
+                        <h3>${escapeHtml(getHostname(item.url))}</h3>
+                        <p class="url-preview">${escapeHtml(item.url)}</p>
+                        <div class="tag-row">
+                          <span>${escapeHtml(currentBatch.schedule)}</span>
+                          ${currentBatch.keywords
+                            .slice(0, 3)
+                            .map((tag) => `<span>${escapeHtml(tag)}</span>`)
+                            .join("")}
+                        </div>
+                        <div class="card-actions">
+                          <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">
+                            打开链接
+                          </a>
+                        </div>
+                      </section>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : `
+              <article class="empty-state">
+                <h2>这一天没有匹配到结果</h2>
+                <p>可以清空筛选词，或者切换到上一天 / 下一天继续查看。</p>
+              </article>
+            `
+        }
+      </section>
+    </div>
+  `;
+
+  const searchInput = document.querySelector<HTMLInputElement>("#search-input");
+  const prevButton = document.querySelector<HTMLButtonElement>("[data-action='prev-day']");
+  const nextButton = document.querySelector<HTMLButtonElement>("[data-action='next-day']");
+
+  searchInput?.addEventListener("input", (event) => {
+    state.keyword = (event.target as HTMLInputElement).value;
+    render();
+  });
+
+  prevButton?.addEventListener("click", () => {
+    if (!hasPrevDay) {
+      return;
+    }
+
+    state.currentIndex += 1;
+    render();
+  });
+
+  nextButton?.addEventListener("click", () => {
+    if (!hasNextDay) {
+      return;
+    }
+
+    state.currentIndex -= 1;
+    render();
+  });
+};
+
 const bootstrap = async () => {
-  renderMessage("正在加载", "正在从 SQLite 读取每日链接数据。");
+  renderEmpty("正在加载", "正在从 SQLite 读取每日链接数据。");
 
   try {
     const response = await fetch("/api/batches", { cache: "no-store" });
@@ -203,10 +265,12 @@ const bootstrap = async () => {
     }
 
     const payload = (await response.json()) as { items: DailyBatch[] };
-    render(payload.items);
+    state.batches = payload.items;
+    state.currentIndex = 0;
+    render();
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";
-    renderMessage("加载失败", `无法读取数据：${message}`);
+    renderEmpty("加载失败", `无法读取数据：${message}`);
   }
 };
 
