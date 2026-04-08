@@ -5,6 +5,8 @@ type DailyLink = {
   rank: number;
   url: string;
   collectedAt: string;
+  title?: string;
+  publishedAt?: string;
 };
 
 type DailyBatch = {
@@ -62,12 +64,36 @@ const formatDateTime = (input: string) => {
   }).format(date);
 };
 
+const formatNewsTime = (input: string) => {
+  const normalized = input.trim();
+  if (!normalized) {
+    return "";
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized) || normalized === "未知") {
+    return normalized;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}$/.test(normalized)) {
+    return formatDateTime(normalized);
+  }
+
+  return normalized;
+};
+
 const getHostname = (url: string) => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
     return "未知来源";
   }
+};
+
+const getLinkTitle = (link: DailyLink) => link.title?.trim() || getHostname(link.url);
+
+const getLinkTime = (link: DailyLink) => {
+  const publishedAt = formatNewsTime(link.publishedAt || "");
+  return publishedAt || formatDateTime(link.collectedAt);
 };
 
 const filterLinks = (batch: DailyBatch, keyword: string) => {
@@ -78,7 +104,7 @@ const filterLinks = (batch: DailyBatch, keyword: string) => {
       return true;
     }
 
-    return [link.url, getHostname(link.url), batch.keywords.join(" ")]
+    return [getLinkTitle(link), link.url, getHostname(link.url), batch.keywords.join(" ")]
       .join(" ")
       .toLowerCase()
       .includes(normalizedKeyword);
@@ -169,7 +195,7 @@ const render = () => {
               <input
                 id="search-input"
                 type="search"
-                placeholder="按域名、链接、关键词过滤"
+                placeholder="按标题、域名、链接、关键词过滤"
                 value="${escapeHtml(state.keyword)}"
               />
             </label>
@@ -183,31 +209,18 @@ const render = () => {
         ${
           filteredLinks.length
             ? `
-              <div class="day-meta">
-                <p class="date-label">${escapeHtml(currentBatch.date)}</p>
-                <span class="date-count">${filteredLinks.length} 条结果</span>
-              </div>
               <div class="card-grid">
                 ${filteredLinks
                   .map(
                     (item) => `
                       <section class="link-card">
                         <div class="card-top">
-                          <span class="source-badge">相关度 #${item.rank}</span>
-                          <time>${escapeHtml(formatDateTime(item.collectedAt))}</time>
+                          <time>${escapeHtml(getLinkTime(item))}</time>
                         </div>
-                        <h3>${escapeHtml(getHostname(item.url))}</h3>
-                        <p class="url-preview">${escapeHtml(item.url)}</p>
-                        <div class="tag-row">
-                          <span>${escapeHtml(currentBatch.schedule)}</span>
-                          ${currentBatch.keywords
-                            .slice(0, 3)
-                            .map((tag) => `<span>${escapeHtml(tag)}</span>`)
-                            .join("")}
-                        </div>
+                        <h3>${escapeHtml(getLinkTitle(item))}</h3>
                         <div class="card-actions">
                           <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">
-                            打开链接
+                            打开原文
                           </a>
                         </div>
                       </section>

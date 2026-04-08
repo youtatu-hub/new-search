@@ -35,6 +35,16 @@ db.exec(`
   );
 `);
 
+const ensureLinkColumn = (columnName, definition) => {
+  const columns = db.prepare("PRAGMA table_info(links)").all();
+  if (!columns.some((column) => column.name === columnName)) {
+    db.exec(`ALTER TABLE links ADD COLUMN ${columnName} ${definition}`);
+  }
+};
+
+ensureLinkColumn("title", "TEXT NOT NULL DEFAULT ''");
+ensureLinkColumn("published_at", "TEXT NOT NULL DEFAULT ''");
+
 const countStmt = db.prepare("SELECT COUNT(*) AS total FROM batches");
 const upsertBatchStmt = db.prepare(`
   INSERT INTO batches (date, schedule_time, keywords)
@@ -47,8 +57,8 @@ const upsertBatchStmt = db.prepare(`
 const selectBatchIdStmt = db.prepare("SELECT id FROM batches WHERE date = ?");
 const deleteLinksStmt = db.prepare("DELETE FROM links WHERE batch_id = ?");
 const insertLinkStmt = db.prepare(`
-  INSERT INTO links (batch_id, rank, url, collected_at)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO links (batch_id, rank, url, collected_at, title, published_at)
+  VALUES (?, ?, ?, ?, ?, ?)
 `);
 const listStmt = db.prepare(`
   SELECT
@@ -59,7 +69,9 @@ const listStmt = db.prepare(`
     l.id AS link_id,
     l.rank,
     l.url,
-    l.collected_at
+    l.collected_at,
+    l.title,
+    l.published_at
   FROM batches b
   LEFT JOIN links l ON l.batch_id = b.id
   ORDER BY b.date DESC, l.rank ASC
@@ -100,7 +112,14 @@ const saveBatch = (payload) => {
     deleteLinksStmt.run(batchId);
 
     for (const link of payload.links) {
-      insertLinkStmt.run(batchId, link.rank, link.url, link.collectedAt);
+      insertLinkStmt.run(
+        batchId,
+        link.rank,
+        link.url,
+        link.collectedAt,
+        link.title || "",
+        link.publishedAt || ""
+      );
     }
 
     db.exec("COMMIT");
@@ -175,8 +194,12 @@ const validatePayload = (payload) => {
   const links = Array.isArray(payload.links)
     ? payload.links.map((item, index) => ({
         rank: Number(item.rank || index + 1),
-        url: String(item.url || "").trim(),
-        collectedAt: String(item.collectedAt || "").trim()
+        url: String(item.url || item.link || item["链接"] || "").trim(),
+        collectedAt: String(item.collectedAt || item["采集时间"] || "").trim(),
+        title: String(item.title || item["标题"] || "").trim(),
+        publishedAt: String(
+          item.publishedAt || item.newsTime || item.date || item["时间"] || ""
+        ).trim()
       }))
     : [];
 
@@ -236,7 +259,9 @@ const readBatches = () => {
         id: row.link_id,
         rank: row.rank,
         url: row.url,
-        collectedAt: row.collected_at
+        collectedAt: row.collected_at,
+        title: row.title,
+        publishedAt: row.published_at
       });
     }
   }

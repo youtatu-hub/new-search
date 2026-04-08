@@ -29,6 +29,81 @@ const defaultLinks = [
   "http://lianghui.people.com.cn/2026/BIG5/n1/2026/0309/c461828-40678381.html"
 ].join("\n");
 
+type LinkInputPayload = {
+  rank: number;
+  url: string;
+  collectedAt: string;
+  title: string;
+  publishedAt: string;
+};
+
+const padMinute = (index: number) => String(index).padStart(2, "0");
+
+const buildCollectedAt = (date: string, value: string, index: number) => {
+  const normalized = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+
+  return `${date} 09:${padMinute(index)}`;
+};
+
+const parseLinksInput = (raw: string, date: string): LinkInputPayload[] => {
+  const trimmed = raw.trim();
+
+  if (!trimmed) {
+    return [];
+  }
+
+  if (/^[\[{]/.test(trimmed)) {
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      throw new Error("JSON 解析失败，请检查格式");
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new Error("JSON 内容必须是数组");
+    }
+
+    return parsed.map((entry, index) => {
+      if (!entry || typeof entry !== "object") {
+        throw new Error(`第 ${index + 1} 条 JSON 数据格式不正确`);
+      }
+
+      const item = entry as Record<string, unknown>;
+      const url = String(item.url || item.link || item["链接"] || "").trim();
+      const title = String(item.title || item["标题"] || "").trim();
+      const publishedAt = String(
+        item.publishedAt || item.newsTime || item.date || item["时间"] || ""
+      ).trim();
+      const collectedAtInput = String(item.collectedAt || item["采集时间"] || "").trim();
+
+      return {
+        rank: index + 1,
+        url,
+        title,
+        publishedAt,
+        collectedAt: buildCollectedAt(date, collectedAtInput || publishedAt, index)
+      };
+    });
+  }
+
+  return trimmed
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((url, index) => ({
+      rank: index + 1,
+      url,
+      title: "",
+      publishedAt: "",
+      collectedAt: `${date} 09:${padMinute(index)}`
+    }));
+};
+
 const render = () => {
   app.innerHTML = `
     <section class="panel">
@@ -55,13 +130,13 @@ const render = () => {
           <input name="keywords" type="text" value="${defaultKeywords}" required />
         </label>
         <label class="full">
-          <span>链接列表</span>
-          <textarea name="links" rows="14" required placeholder="每行一个链接，按相关度从高到低粘贴">${defaultLinks}</textarea>
+          <span>链接列表 / JSON 数组</span>
+          <textarea name="links" rows="14" required placeholder="支持两种格式：1. 每行一个链接；2. 直接粘贴 [{&quot;时间&quot;,&quot;标题&quot;,&quot;链接&quot;}] JSON">${defaultLinks}</textarea>
         </label>
         <button type="submit">保存到 SQLite</button>
       </form>
 
-      <p id="result" class="result">提交时会按行号自动生成相关度排序和采集时间。</p>
+      <p id="result" class="result">支持纯链接逐行录入，也支持直接粘贴包含“时间 / 标题 / 链接”的 JSON 数组。</p>
     </section>
   `;
 
@@ -82,15 +157,7 @@ const render = () => {
       .split("|")
       .map((item) => item.trim())
       .filter(Boolean);
-    const links = String(formData.get("links") || "")
-      .split(/\r?\n/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .map((url, index) => ({
-        rank: index + 1,
-        url,
-        collectedAt: `${date} 09:${String(index).padStart(2, "0")}`
-      }));
+    const links = parseLinksInput(String(formData.get("links") || ""), date);
 
     result.textContent = "正在保存...";
 
