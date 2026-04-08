@@ -135,33 +135,35 @@ const render = () => {
 
   app.innerHTML = `
     <div class="page-frame">
-      <button
-        class="day-nav day-nav-prev"
-        type="button"
-        data-action="prev-day"
-        ${hasPrevDay ? "" : "disabled"}
-        aria-label="切换到上一天"
-      >
-        <span class="nav-arrow">‹</span>
-        <span class="nav-copy">
-          <strong>上一天</strong>
-          <small>${escapeHtml(prevDate || "无数据")}</small>
-        </span>
-      </button>
+      <div class="day-nav-row">
+        <button
+          class="day-nav day-nav-prev"
+          type="button"
+          data-action="prev-day"
+          ${hasPrevDay ? "" : "disabled"}
+          aria-label="切换到上一天"
+        >
+          <span class="nav-arrow">‹</span>
+          <span class="nav-copy">
+            <strong>上一天</strong>
+            <small>${escapeHtml(prevDate || "无数据")}</small>
+          </span>
+        </button>
 
-      <button
-        class="day-nav day-nav-next"
-        type="button"
-        data-action="next-day"
-        ${hasNextDay ? "" : "disabled"}
-        aria-label="切换到下一天"
-      >
-        <span class="nav-copy">
-          <strong>下一天</strong>
-          <small>${escapeHtml(nextDate || "无数据")}</small>
-        </span>
-        <span class="nav-arrow">›</span>
-      </button>
+        <button
+          class="day-nav day-nav-next"
+          type="button"
+          data-action="next-day"
+          ${hasNextDay ? "" : "disabled"}
+          aria-label="切换到下一天"
+        >
+          <span class="nav-copy">
+            <strong>下一天</strong>
+            <small>${escapeHtml(nextDate || "无数据")}</small>
+          </span>
+          <span class="nav-arrow">›</span>
+        </button>
+      </div>
 
       <section class="overview-panel">
         <div class="overview-head">
