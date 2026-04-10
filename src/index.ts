@@ -170,7 +170,6 @@ const render = () => {
           <span class="nav-arrow">‹</span>
           <span class="nav-copy">
             <strong>上一天</strong>
-            <small>${escapeHtml(prevDate || "无数据")}</small>
           </span>
         </button>
 
@@ -183,7 +182,6 @@ const render = () => {
         >
           <span class="nav-copy">
             <strong>下一天</strong>
-            <small>${escapeHtml(nextDate || "无数据")}</small>
           </span>
           <span class="nav-arrow">›</span>
         </button>
