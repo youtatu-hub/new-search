@@ -183,7 +183,7 @@ const render = () => {
         >
           <span class="nav-copy">
             <strong>下一天</strong>
-            <small>${escapeHtml(prevDate)}</small>
+            <small>${escapeHtml(nextDate)}</small>
           </span>
           <span class="nav-arrow">›</span>
         </button>
