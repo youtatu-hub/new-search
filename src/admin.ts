@@ -6,6 +6,8 @@ if (!app) {
   throw new Error("找不到 #admin-app 容器");
 }
 
+const requestedDate = new URL(window.location.href).searchParams.get("date")?.trim() || "";
+
 const today = new Date().toISOString().slice(0, 10);
 
 const defaultKeywords =
@@ -37,6 +39,22 @@ type LinkInputPayload = {
   publishedAt: string;
 };
 
+type DailyBatch = {
+  id: number;
+  date: string;
+  schedule: string;
+  keywords: string[];
+  links: LinkInputPayload[];
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 const padMinute = (index: number) => String(index).padStart(2, "0");
 
 const buildCollectedAt = (date: string, value: string, index: number) => {
@@ -46,6 +64,23 @@ const buildCollectedAt = (date: string, value: string, index: number) => {
   }
 
   return `${date} 09:${padMinute(index)}`;
+};
+
+const stringifyLinksInput = (links: LinkInputPayload[]) => {
+  if (!links.length) {
+    return defaultLinks;
+  }
+
+  return JSON.stringify(
+    links.map((link) => ({
+      时间: link.publishedAt || "",
+      标题: link.title || "",
+      链接: link.url,
+      采集时间: link.collectedAt
+    })),
+    null,
+    2
+  );
 };
 
 const parseLinksInput = (raw: string, date: string): LinkInputPayload[] => {
@@ -104,7 +139,12 @@ const parseLinksInput = (raw: string, date: string): LinkInputPayload[] => {
     }));
 };
 
-const render = () => {
+const render = (batch?: DailyBatch) => {
+  const initialDate = batch?.date || today;
+  const initialSchedule = batch?.schedule || "每天早晨 9:00";
+  const initialKeywords = batch?.keywords?.length ? batch.keywords.join("|") : defaultKeywords;
+  const initialLinks = batch ? stringifyLinksInput(batch.links) : defaultLinks;
+
   app.innerHTML = `
     <section class="panel">
       <div class="panel-head">
@@ -119,24 +159,24 @@ const render = () => {
       <form id="entry-form" class="entry-form">
         <label>
           <span>日期</span>
-          <input name="date" type="date" value="${today}" required />
+          <input name="date" type="date" value="${escapeHtml(initialDate)}" required />
         </label>
         <label>
           <span>采集时间</span>
-          <input name="schedule" type="text" value="每天早晨 9:00" required />
+          <input name="schedule" type="text" value="${escapeHtml(initialSchedule)}" required />
         </label>
         <label class="full">
           <span>关键词</span>
-          <input name="keywords" type="text" value="${defaultKeywords}" required />
+          <input name="keywords" type="text" value="${escapeHtml(initialKeywords)}" required />
         </label>
         <label class="full">
           <span>链接列表 / JSON 数组</span>
-          <textarea name="links" rows="14" required placeholder="支持两种格式：1. 每行一个链接；2. 直接粘贴 [{&quot;时间&quot;,&quot;标题&quot;,&quot;链接&quot;}] JSON">${defaultLinks}</textarea>
+          <textarea name="links" rows="14" required placeholder="支持两种格式：1. 每行一个链接；2. 直接粘贴 [{&quot;时间&quot;,&quot;标题&quot;,&quot;链接&quot;}] JSON">${escapeHtml(initialLinks)}</textarea>
         </label>
         <button type="submit">保存到 SQLite</button>
       </form>
 
-      <p id="result" class="result">支持纯链接逐行录入，也支持直接粘贴包含“时间 / 标题 / 链接”的 JSON 数组。</p>
+      <p id="result" class="result">${batch ? `已载入 ${escapeHtml(batch.date)} 的录入数据，共 ${batch.links.length} 条。` : "支持纯链接逐行录入，也支持直接粘贴包含“时间 / 标题 / 链接”的 JSON 数组。"}</p>
     </section>
   `;
 
@@ -186,4 +226,22 @@ const render = () => {
   });
 };
 
-render();
+const bootstrap = async () => {
+  try {
+    const response = await fetch("/api/batches", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`接口返回 ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { items: DailyBatch[] };
+    const matchedBatch = requestedDate
+      ? payload.items.find((item) => item.date === requestedDate)
+      : undefined;
+
+    render(matchedBatch || payload.items[0]);
+  } catch {
+    render();
+  }
+};
+
+bootstrap();

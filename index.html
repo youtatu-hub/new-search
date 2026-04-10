@@ -210,7 +210,8 @@
         font-size: 24px;
       }
 
-      .card-actions a {
+      .card-actions a,
+      .card-actions button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -235,6 +236,11 @@
         border-radius: 20px;
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 244, 236, 0.92));
         border: 1px solid rgba(87, 61, 38, 0.1);
+      }
+
+      .link-card.is-used {
+        background: linear-gradient(180deg, rgba(231, 247, 233, 0.98), rgba(210, 236, 216, 0.94));
+        border-color: rgba(68, 133, 83, 0.28);
       }
 
       .card-top {
@@ -265,17 +271,25 @@
       .card-actions {
         margin-top: auto;
         padding-top: 18px;
+        display: flex;
+        gap: 10px;
       }
 
-      .card-actions a {
+      .card-actions a,
+      .card-actions button {
         min-width: 100px;
         padding: 10px 14px;
-        color: #fff8f1;
-        background: linear-gradient(135deg, var(--brand) 0%, #cb7b42 100%);
-        text-decoration: none;
+        border: none;
+        font: inherit;
         font-weight: 700;
         font-size: 13px;
         transition: transform 160ms ease, box-shadow 160ms ease;
+      }
+
+      .card-actions a {
+        color: #fff8f1;
+        background: linear-gradient(135deg, var(--brand) 0%, #cb7b42 100%);
+        text-decoration: none;
         box-shadow: 0 14px 24px rgba(184, 92, 56, 0.22);
       }
 
@@ -284,9 +298,28 @@
         box-shadow: 0 18px 30px rgba(184, 92, 56, 0.28);
       }
 
+      .card-actions button {
+        color: #24563a;
+        background: rgba(182, 218, 189, 0.78);
+        box-shadow: 0 10px 20px rgba(64, 120, 79, 0.14);
+        cursor: pointer;
+      }
+
+      .card-actions button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 24px rgba(64, 120, 79, 0.2);
+      }
+
+      .card-actions button:disabled {
+        cursor: default;
+        opacity: 0.72;
+        transform: none;
+        box-shadow: none;
+      }
+
       .day-nav {
         position: fixed;
-        top: calc(50% + 70px);
+        top: calc(50% + 64px);
         z-index: 20;
         display: inline-flex;
         align-items: center;
@@ -557,7 +590,8 @@
           padding-top: 14px;
         }
 
-        .card-actions a {
+        .card-actions a,
+        .card-actions button {
           width: 100%;
           min-width: 0;
           padding: 9px 12px;

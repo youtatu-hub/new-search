@@ -21,6 +21,7 @@ type ViewState = {
   batches: DailyBatch[];
   currentIndex: number;
   keyword: string;
+  usedLinkIds: string[];
 };
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -32,8 +33,11 @@ if (!app) {
 const state: ViewState = {
   batches: [],
   currentIndex: 0,
-  keyword: ""
+  keyword: "",
+  usedLinkIds: []
 };
+
+const USED_LINKS_STORAGE_KEY = "used-link-ids";
 
 const escapeHtml = (value: string) =>
   value
@@ -94,6 +98,26 @@ const getLinkTitle = (link: DailyLink) => link.title?.trim() || getHostname(link
 const getLinkTime = (link: DailyLink) => {
   const publishedAt = formatNewsTime(link.publishedAt || "");
   return publishedAt || formatDateTime(link.collectedAt);
+};
+
+const getUsedLinkKey = (link: DailyLink) => `${link.id}:${link.url}`;
+
+const loadUsedLinkIds = () => {
+  try {
+    const raw = window.localStorage.getItem(USED_LINKS_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveUsedLinkIds = () => {
+  window.localStorage.setItem(USED_LINKS_STORAGE_KEY, JSON.stringify(state.usedLinkIds));
 };
 
 const filterLinks = (batch: DailyBatch, keyword: string) => {
@@ -185,7 +209,7 @@ const render = () => {
             </article>
             <article>
               <span>录入入口</span>
-              <strong><a class="admin-link" href="/admin.html">打开后台</a></strong>
+              <strong><a class="admin-link" href="/admin.html?date=${encodeURIComponent(currentBatch.date)}">打开后台</a></strong>
             </article>
           </div>
         </div>
@@ -214,8 +238,12 @@ const render = () => {
               <div class="card-grid">
                 ${filteredLinks
                   .map(
-                    (item) => `
-                      <section class="link-card">
+                    (item) => {
+                      const usedKey = getUsedLinkKey(item);
+                      const isUsed = state.usedLinkIds.includes(usedKey);
+
+                      return `
+                      <section class="link-card ${isUsed ? "is-used" : ""}">
                         <div class="card-top">
                           <time>${escapeHtml(getLinkTime(item))}</time>
                         </div>
@@ -224,9 +252,18 @@ const render = () => {
                           <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">
                             打开原文
                           </a>
+                          <button
+                            class="used-button"
+                            type="button"
+                            data-action="mark-used"
+                            data-link-key="${escapeHtml(usedKey)}"
+                          >
+                            已使用
+                          </button>
                         </div>
                       </section>
-                    `
+                    `;
+                    }
                   )
                   .join("")}
               </div>
@@ -245,6 +282,7 @@ const render = () => {
   const searchInput = document.querySelector<HTMLInputElement>("#search-input");
   const prevButton = document.querySelector<HTMLButtonElement>("[data-action='prev-day']");
   const nextButton = document.querySelector<HTMLButtonElement>("[data-action='next-day']");
+  const usedButtons = document.querySelectorAll<HTMLButtonElement>("[data-action='mark-used']");
 
   searchInput?.addEventListener("input", (event) => {
     state.keyword = (event.target as HTMLInputElement).value;
@@ -268,6 +306,21 @@ const render = () => {
     state.currentIndex -= 1;
     render();
   });
+
+  usedButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const linkKey = button.dataset.linkKey;
+      if (!linkKey) {
+        return;
+      }
+
+      state.usedLinkIds = state.usedLinkIds.includes(linkKey)
+        ? state.usedLinkIds.filter((item) => item !== linkKey)
+        : [...state.usedLinkIds, linkKey];
+      saveUsedLinkIds();
+      render();
+    });
+  });
 };
 
 const bootstrap = async () => {
@@ -282,6 +335,7 @@ const bootstrap = async () => {
     const payload = (await response.json()) as { items: DailyBatch[] };
     state.batches = payload.items;
     state.currentIndex = 0;
+    state.usedLinkIds = loadUsedLinkIds();
     render();
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";
